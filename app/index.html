@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VBM Interactive Paper | Thompson et al. (2020)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="paper-header">
+            <h1>Universal Vote-by-Mail Has No Impact on Partisan Turnout or Vote Share</h1>
+            <p class="subtitle">Thompson, Wu, Yoder & Hall (2020) · Interactive Replication & Extension</p>
+            <p class="intro">
+                Explore robustness checks and alternative specifications through the chat interface below.
+                Ask questions like "What if we excluded California?" or "Show me presidential elections only."
+            </p>
+            <p class="data-note">
+                126 counties (CA, UT, WA) • 1996-2024 •
+                <a href="https://github.com/andybhall/vbm-replication-extension" target="_blank">View replication data →</a>
+            </p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Table 2 Section -->
+            <section class="results-section" id="table-section">
+                <h2>Table 2: Effect of Universal VBM on Democratic Vote Share and Turnout</h2>
+
+                <div class="table-container" id="table-display">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th colspan="2">Democratic Vote Share</th>
+                                <th colspan="2">Turnout</th>
+                            </tr>
+                            <tr>
+                                <th>Specification</th>
+                                <th>Original<br>(1996-2018)</th>
+                                <th>Extended<br>(1996-2024)</th>
+                                <th>Original<br>(1996-2018)</th>
+                                <th>Extended<br>(1996-2024)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                    <div class="table-notes">
+                        <strong>Notes:</strong> County + State×Year FE. Clustered SE by county.
+                        * p<0.1, ** p<0.05, *** p<0.01
+                    </div>
+                </div>
+
+                <!-- Chat Interface -->
+                <div class="chat-container" id="table-chat">
+                    <div class="chat-header">
+                        <span>Explore Robustness Checks</span>
+                        <span class="query-counter" id="table-query-counter">100 queries remaining</span>
+                    </div>
+                    <div class="chat-examples">
+                        <span class="example-label">Samples:</span>
+                        <button class="example-btn" data-query="California only">CA only</button>
+                        <button class="example-btn" data-query="Utah only">UT only</button>
+                        <button class="example-btn" data-query="Washington only">WA only</button>
+                        <button class="example-btn" data-query="Exclude California">Excl CA</button>
+                        <button class="example-btn" data-query="Exclude Utah">Excl UT</button>
+                        <button class="example-btn" data-query="Exclude Washington">Excl WA</button>
+                    </div>
+                    <div class="chat-examples">
+                        <span class="example-label">Time:</span>
+                        <button class="example-btn" data-query="Original period 1996-2018">1996-2018</button>
+                        <button class="example-btn" data-query="Post-2018 only (2018-2024)">2018-2024</button>
+                        <button class="example-btn" data-query="Excluding 2024 (1996-2022)">Excl 2024</button>
+                    </div>
+                    <div class="chat-examples">
+                        <span class="example-label">Race:</span>
+                        <button class="example-btn" data-query="Presidential elections only">Presidential</button>
+                        <button class="example-btn" data-query="Senate elections only">Senate</button>
+                        <button class="example-btn" data-query="Governor elections only">Governor</button>
+                    </div>
+                    <div class="chat-examples">
+                        <span class="example-label">Trends:</span>
+                        <button class="example-btn" data-query="Linear trends specification">Linear</button>
+                        <button class="example-btn" data-query="Quadratic trends specification">Quadratic</button>
+                    </div>
+                    <div class="chat-examples">
+                        <span class="example-label">Combos:</span>
+                        <button class="example-btn" data-query="Presidential elections California only quadratic">Pres + CA + Quad</button>
+                        <button class="example-btn" data-query="Presidential elections Utah only quadratic">Pres + UT + Quad</button>
+                        <button class="example-btn" data-query="Presidential elections exclude California quadratic">Pres + Excl CA + Quad</button>
+                        <button class="example-btn" data-query="Turnout California only linear trends">Turn + CA + Linear</button>
+                    </div>
+                    <div class="chat-messages" id="table-messages"></div>
+                    <div class="chat-input-container">
+                        <input type="text"
+                               id="table-input"
+                               placeholder="Or ask your own question: e.g., 'Presidential elections in California only'"
+                               maxlength="200"
+                               class="chat-input">
+                        <button id="table-submit" class="chat-submit">Ask</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Loading indicator -->
+        <div class="loading-overlay" id="loading">
+            <div class="loading-spinner"></div>
+            <p>Loading analysis data...</p>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            Based on Thompson, Wu, Yoder & Hall (2020), <em>PNAS</em>.
+            Interactive visualizer built with Claude Code.
+        </footer>
+    </div>
+
+    <script src="assets/app.js"></script>
+</body>
+</html>
