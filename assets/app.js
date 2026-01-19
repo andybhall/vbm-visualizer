@@ -369,11 +369,11 @@ function findBestMatchKeyword(query, section) {
         { regex: /original|1996.?2018/i, time: [1996, 2018] },
         { regex: /post.?2018|after 2018|2018.?2024/i, time: [2018, 2024] },
         { regex: /without 2024|exclud.*2024|1996.?2022|excl.*2024/i, time: [1996, 2022] },
-        // Outcomes
+        // Outcomes - turnout first since it's a distinct concept from vote share
+        { regex: /turn(out)?/i, outcome: 'turnout' },
         { regex: /pres(ident(ial)?)?/i, outcome: 'dem_share_pres' },
         { regex: /gov(ernor)?/i, outcome: 'dem_share_gov' },
         { regex: /sen(at(e|or))?/i, outcome: 'dem_share_sen' },
-        { regex: /turn(out)?/i, outcome: 'turnout' },
         { regex: /vote\s*share|partisan|democrat/i, outcome: 'dem_share' },
         // Specifications
         { regex: /linear/i, spec: 'linear' },
