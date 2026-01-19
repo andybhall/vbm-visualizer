@@ -244,9 +244,13 @@ function getSignificanceDescription(pValue) {
  * Get baseline analysis for a given outcome
  * Baseline = quadratic trends, full sample, full time period (1996-2024)
  * This is fixed and never varies regardless of user query
+ * For vote share outcomes, always use pooled dem_share baseline
+ * For turnout, use turnout baseline
  */
 function getBaseline(outcome) {
-    return findAnalysis(outcome, 'quadratic', null, null);
+    // Normalize vote share outcomes to use the pooled dem_share baseline
+    const baselineOutcome = outcome === 'turnout' ? 'turnout' : 'dem_share';
+    return findAnalysis(baselineOutcome, 'quadratic', null, null);
 }
 
 /**
