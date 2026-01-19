@@ -402,6 +402,7 @@ function findBestMatchKeyword(query, section) {
     // should take priority over generic patterns like 'democrat/vote share')
     for (const pattern of patterns) {
         if (pattern.regex.test(queryLower)) {
+            console.log('Pattern matched:', pattern.regex.toString(), '→', pattern.outcome || pattern.spec || pattern.filter || pattern.time);
             if (pattern.filter) targetFilter = pattern.filter;
             if (pattern.time) targetTime = pattern.time;
             if (pattern.outcome && !targetOutcome) targetOutcome = pattern.outcome;  // Don't overwrite!
@@ -409,6 +410,7 @@ function findBestMatchKeyword(query, section) {
             if (pattern.spec) targetSpec = pattern.spec;
         }
     }
+    console.log('Final targetOutcome:', targetOutcome);
 
     // Second pass: check state inclusion patterns only if no exclude filter was set
     if (!targetFilter || !targetFilter.startsWith('exclude_')) {
@@ -453,6 +455,8 @@ function findBestMatchKeyword(query, section) {
             bestMatch = analysis;
         }
     }
+
+    console.log('Best match:', bestMatch?.outcome, bestMatch?.specification, 'score:', bestScore);
 
     // Normalize score to similarity-like value (0-1)
     const maxPossibleScore = 30;
