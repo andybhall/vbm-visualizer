@@ -398,11 +398,13 @@ function findBestMatchKeyword(query, section) {
     let targetSpec = 'basic';
 
     // First pass: check all patterns
+    // Note: Don't overwrite outcome if already set (specific patterns like 'presidential'
+    // should take priority over generic patterns like 'democrat/vote share')
     for (const pattern of patterns) {
         if (pattern.regex.test(queryLower)) {
             if (pattern.filter) targetFilter = pattern.filter;
             if (pattern.time) targetTime = pattern.time;
-            if (pattern.outcome) targetOutcome = pattern.outcome;
+            if (pattern.outcome && !targetOutcome) targetOutcome = pattern.outcome;  // Don't overwrite!
             if (pattern.weighted) targetWeighted = pattern.weighted;
             if (pattern.spec) targetSpec = pattern.spec;
         }
