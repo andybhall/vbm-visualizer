@@ -242,10 +242,11 @@ function getSignificanceDescription(pValue) {
 
 /**
  * Get baseline analysis for a given outcome
- * Baseline = basic specification, full sample, full time period (1996-2024)
+ * Baseline = quadratic trends, full sample, full time period (1996-2024)
+ * This is fixed and never varies regardless of user query
  */
 function getBaseline(outcome) {
-    return findAnalysis(outcome, 'basic', null, null);
+    return findAnalysis(outcome, 'quadratic', null, null);
 }
 
 /**
@@ -456,7 +457,7 @@ async function generateResponse(query, analysis) {
     let baselineInfo = '';
     if (baseline) {
         const baselineStars = getSignificanceStars(baseline);
-        baselineInfo = `\nBASELINE for ${outcomeLabel} (basic specification, full sample, 1996-2024):
+        baselineInfo = `\nBASELINE for ${outcomeLabel} (quadratic trends, full sample, 1996-2024):
 - Coefficient: ${baseline.coefficient?.toFixed(4)}${baselineStars}
 - Standard Error: ${baseline.std_error?.toFixed(4)}
 - Significance: ${getSignificanceDescription(baseline.p_value)}`;
@@ -592,10 +593,14 @@ function addMessage(container, role, text, analysis = null) {
 
 /**
  * Render the coefficient plot (forest plot style)
+ * If current is null, shows only baseline (single row)
  */
 function renderCoefPlot(baseline, current, outcomeLabel, filterDesc) {
     const container = document.getElementById('coef-plot');
     if (!container) return;
+
+    // Determine if we're showing one row or two
+    const showCurrent = current !== null;
 
     // Determine the x-axis range based on the data
     const allCoefs = [baseline, current].filter(a => a);
@@ -604,9 +609,9 @@ function renderCoefPlot(baseline, current, outcomeLabel, filterDesc) {
     const minVal = Math.min(...allLower, 0) - 0.01;
     const maxVal = Math.max(...allUpper, 0) + 0.01;
 
-    // SVG dimensions
+    // SVG dimensions - shorter if only showing baseline
     const width = 400;
-    const height = 100;
+    const height = showCurrent ? 100 : 70;
     const margin = { left: 160, right: 80, top: 20, bottom: 30 };
     const plotWidth = width - margin.left - margin.right;
     const plotHeight = height - margin.top - margin.bottom;
@@ -625,7 +630,7 @@ function renderCoefPlot(baseline, current, outcomeLabel, filterDesc) {
     // Zero line
     svg += `<line x1="${zeroX}" y1="${margin.top}" x2="${zeroX}" y2="${margin.top + plotHeight}" class="coef-zero-line"/>`;
 
-    // Baseline row
+    // Baseline row (always shown)
     if (baseline) {
         const bCoef = baseline.coefficient;
         const bLower = baseline.ci_lower || (bCoef - 1.96 * baseline.std_error);
@@ -636,14 +641,14 @@ function renderCoefPlot(baseline, current, outcomeLabel, filterDesc) {
         const bSig = baseline.p_value < 0.05 ? '' : ' not-significant';
         const bStars = getSignificanceStars(baseline);
 
-        svg += `<text x="${margin.left - 10}" y="${row1Y + 4}" text-anchor="end" class="coef-row-label">Baseline (full sample)</text>`;
+        svg += `<text x="${margin.left - 10}" y="${row1Y + 4}" text-anchor="end" class="coef-row-label">Baseline (quad. trends)</text>`;
         svg += `<line x1="${bXLower}" y1="${row1Y}" x2="${bXUpper}" y2="${row1Y}" class="coef-ci${bSig}"/>`;
         svg += `<circle cx="${bX}" cy="${row1Y}" r="5" class="coef-point${bSig}"/>`;
         svg += `<text x="${width - margin.right + 10}" y="${row1Y + 4}" class="coef-axis-label">${bCoef.toFixed(4)}${bStars}</text>`;
     }
 
-    // Current specification row
-    if (current) {
+    // Current specification row (only if provided)
+    if (showCurrent && current) {
         const cCoef = current.coefficient;
         const cLower = current.ci_lower || (cCoef - 1.96 * current.std_error);
         const cUpper = current.ci_upper || (cCoef + 1.96 * current.std_error);
@@ -692,18 +697,17 @@ function updateCoefPlot(baseline, analysis, outcomeLabel) {
 }
 
 /**
- * Initialize the coefficient plot with baseline values
+ * Initialize the coefficient plot with baseline value (shown once)
  */
 function initCoefPlot() {
     const demBaseline = getBaseline('dem_share');
-    const turnBaseline = getBaseline('turnout');
 
     const container = document.getElementById('coef-plot');
     if (!container) return;
 
-    // Show initial placeholder or default baselines
+    // Show baseline only (pass null for current to show single row)
     if (demBaseline) {
-        renderCoefPlot(demBaseline, demBaseline, 'Democratic Vote Share', 'Baseline (full sample)');
+        renderCoefPlot(demBaseline, null, 'Democratic Vote Share', null);
     } else {
         container.innerHTML = `
             <div class="coef-plot-placeholder">
