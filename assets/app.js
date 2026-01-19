@@ -598,6 +598,7 @@ function addMessage(container, role, text, analysis = null) {
         `;
 
         // Update the coefficient plot
+        console.log('Updating plot - outcomeLabel:', outcomeLabel, 'baseline coef:', baseline?.coefficient, 'analysis coef:', analysis?.coefficient);
         updateCoefPlot(baseline, analysis, outcomeLabel);
     }
 
