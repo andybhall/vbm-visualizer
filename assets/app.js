@@ -163,15 +163,19 @@ function displayBaselineTable() {
         `;
     }
 
-    // Add observation count row
-    const demExtFull = findAnalysis('dem_share', 'basic', null, null);
-    const turnExtFull = findAnalysis('turnout', 'basic', null, null);
+    // Add observation count row - show separate N for original vs extended
+    const demOrig = findAnalysis('dem_share', 'basic', null, [1996, 2018]);
+    const demExt = findAnalysis('dem_share', 'basic', null, null);
+    const turnOrig = findAnalysis('turnout', 'basic', null, [1996, 2018]);
+    const turnExt = findAnalysis('turnout', 'basic', null, null);
 
     html += `
         <tr>
             <td>Observations</td>
-            <td colspan="2">${demExtFull ? demExtFull.n_obs.toLocaleString() : 'N/A'}</td>
-            <td colspan="2">${turnExtFull ? turnExtFull.n_obs.toLocaleString() : 'N/A'}</td>
+            <td>${demOrig ? demOrig.n_obs.toLocaleString() : 'N/A'}</td>
+            <td>${demExt ? demExt.n_obs.toLocaleString() : 'N/A'}</td>
+            <td>${turnOrig ? turnOrig.n_obs.toLocaleString() : 'N/A'}</td>
+            <td>${turnExt ? turnExt.n_obs.toLocaleString() : 'N/A'}</td>
         </tr>
     `;
 
@@ -307,6 +311,11 @@ async function handleQuery(section) {
     try {
         // Use keyword matching to find relevant analysis
         const match = findBestMatchKeyword(query, section);
+
+        // Debug: log what was matched
+        console.log('Query:', query);
+        console.log('Matched analysis:', match.analysis?.outcome, match.analysis?.specification, 'N=', match.analysis?.n_obs);
+        console.log('Similarity:', match.similarity);
 
         // Increment query count
         queryCount[section]++;
