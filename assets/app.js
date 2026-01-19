@@ -9,6 +9,15 @@ let queryCount = { table: 0 };
 const MAX_QUERIES_PER_HOUR = 100;  // Higher limit for local use
 const SIMILARITY_THRESHOLD = 0.5;
 
+// Outcome labels for clarity
+const OUTCOME_LABELS = {
+    'dem_share': 'Democratic Vote Share',
+    'dem_share_pres': 'Democratic Vote Share (Presidential)',
+    'dem_share_gov': 'Democratic Vote Share (Governor)',
+    'dem_share_sen': 'Democratic Vote Share (Senate)',
+    'turnout': 'Voter Turnout'
+};
+
 // DOM Elements
 const elements = {};
 
@@ -37,6 +46,7 @@ async function init() {
 
     // Initialize displays
     displayBaselineTable();
+    initCoefPlot();
 
     // Set up event listeners
     setupEventListeners();
@@ -218,6 +228,24 @@ function getSignificanceStars(analysis) {
     if (p < 0.05) return '**';
     if (p < 0.1) return '*';
     return '';
+}
+
+/**
+ * Get significance description for system prompt
+ */
+function getSignificanceDescription(pValue) {
+    if (pValue < 0.01) return 'p < 0.01, highly significant';
+    if (pValue < 0.05) return 'p < 0.05, significant';
+    if (pValue < 0.1) return 'p < 0.1, marginally significant';
+    return 'not statistically significant';
+}
+
+/**
+ * Get baseline analysis for a given outcome
+ * Baseline = basic specification, full sample, full time period (1996-2024)
+ */
+function getBaseline(outcome) {
+    return findAnalysis(outcome, 'basic', null, null);
 }
 
 /**
@@ -421,22 +449,38 @@ function findBestMatchKeyword(query, section) {
  * Generate a response using Claude API (via local proxy)
  */
 async function generateResponse(query, analysis) {
+    const outcomeLabel = OUTCOME_LABELS[analysis.outcome] || analysis.outcome;
+    const baseline = getBaseline(analysis.outcome);
+
+    // Build baseline comparison info
+    let baselineInfo = '';
+    if (baseline) {
+        const baselineStars = getSignificanceStars(baseline);
+        baselineInfo = `\nBASELINE for ${outcomeLabel} (basic specification, full sample, 1996-2024):
+- Coefficient: ${baseline.coefficient?.toFixed(4)}${baselineStars}
+- Standard Error: ${baseline.std_error?.toFixed(4)}
+- Significance: ${getSignificanceDescription(baseline.p_value)}`;
+    }
+
     const systemPrompt = `You are an assistant helping users explore robustness checks for a vote-by-mail study.
 
 The user is viewing results from Thompson et al. (2020) "Universal Vote-by-Mail Has No Impact on Partisan Turnout or Vote Share".
+
+OUTCOME VARIABLE: ${outcomeLabel}
 
 Based on their query, you found a pre-computed analysis:
 - Description: ${analysis.description}
 - Coefficient: ${analysis.coefficient?.toFixed(4)}
 - Standard Error: ${analysis.std_error?.toFixed(4)}
-- P-value: ${analysis.p_value?.toFixed(4)}
+- P-value: ${analysis.p_value?.toFixed(4)} (${getSignificanceDescription(analysis.p_value)})
 - N observations: ${analysis.n_obs}
 - Clusters: ${analysis.n_clusters}
+${baselineInfo}
 
 Provide a brief response (2-3 sentences max) that:
-1. Directly answers their question
-2. States the key result (coefficient, significance level)
-3. Notes how it compares to baseline if relevant
+1. Directly answers their question, explicitly mentioning the outcome (${outcomeLabel})
+2. States the key result with specific numbers (coefficient = X.XXX, ${getSignificanceDescription(analysis.p_value)})
+3. Compares to baseline with specific numbers (e.g., "compared to the baseline of ${baseline?.coefficient?.toFixed(4) || 'N/A'}")
 4. Is written in clear, accessible language
 
 Keep it concise - the modified results will be displayed separately.`;
@@ -514,22 +558,159 @@ function addMessage(container, role, text, analysis = null) {
     let html = text;
 
     if (analysis) {
-        // Add result preview
+        // Get outcome label and baseline for comparison
+        const outcomeLabel = OUTCOME_LABELS[analysis.outcome] || analysis.outcome;
+        const baseline = getBaseline(analysis.outcome);
         const stars = getSignificanceStars(analysis);
+
+        // Build baseline comparison string
+        let baselineComparison = '';
+        if (baseline) {
+            const baselineStars = getSignificanceStars(baseline);
+            baselineComparison = `<br><strong>Baseline:</strong> ${baseline.coefficient?.toFixed(4)}${baselineStars} → <strong>This spec:</strong> <span class="highlight-change">${analysis.coefficient?.toFixed(4)}${stars}</span>`;
+        }
+
+        // Add result preview with explicit outcome
         html += `
             <div class="result-preview">
-                <strong>Modified Result:</strong><br>
-                ${analysis.filter_desc || 'Full sample'}<br>
+                <strong>Outcome: ${outcomeLabel}</strong><br>
+                ${analysis.filter_desc || 'Full sample'}${baselineComparison}<br>
                 Coefficient: <span class="highlight-change">${analysis.coefficient?.toFixed(4)}${stars}</span>
                 (SE: ${analysis.std_error?.toFixed(4)})<br>
                 N = ${analysis.n_obs?.toLocaleString()}, Clusters = ${analysis.n_clusters}
             </div>
         `;
+
+        // Update the coefficient plot
+        updateCoefPlot(baseline, analysis, outcomeLabel);
     }
 
     messageEl.innerHTML = html;
     container.appendChild(messageEl);
     container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * Render the coefficient plot (forest plot style)
+ */
+function renderCoefPlot(baseline, current, outcomeLabel, filterDesc) {
+    const container = document.getElementById('coef-plot');
+    if (!container) return;
+
+    // Determine the x-axis range based on the data
+    const allCoefs = [baseline, current].filter(a => a);
+    const allLower = allCoefs.map(a => a.ci_lower || (a.coefficient - 1.96 * a.std_error));
+    const allUpper = allCoefs.map(a => a.ci_upper || (a.coefficient + 1.96 * a.std_error));
+    const minVal = Math.min(...allLower, 0) - 0.01;
+    const maxVal = Math.max(...allUpper, 0) + 0.01;
+
+    // SVG dimensions
+    const width = 400;
+    const height = 100;
+    const margin = { left: 160, right: 80, top: 20, bottom: 30 };
+    const plotWidth = width - margin.left - margin.right;
+    const plotHeight = height - margin.top - margin.bottom;
+
+    // Scale function
+    const scale = (val) => margin.left + ((val - minVal) / (maxVal - minVal)) * plotWidth;
+    const zeroX = scale(0);
+
+    // Row positions
+    const row1Y = margin.top + 15;
+    const row2Y = margin.top + 40;
+
+    // Build SVG
+    let svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
+
+    // Zero line
+    svg += `<line x1="${zeroX}" y1="${margin.top}" x2="${zeroX}" y2="${margin.top + plotHeight}" class="coef-zero-line"/>`;
+
+    // Baseline row
+    if (baseline) {
+        const bCoef = baseline.coefficient;
+        const bLower = baseline.ci_lower || (bCoef - 1.96 * baseline.std_error);
+        const bUpper = baseline.ci_upper || (bCoef + 1.96 * baseline.std_error);
+        const bX = scale(bCoef);
+        const bXLower = scale(bLower);
+        const bXUpper = scale(bUpper);
+        const bSig = baseline.p_value < 0.05 ? '' : ' not-significant';
+        const bStars = getSignificanceStars(baseline);
+
+        svg += `<text x="${margin.left - 10}" y="${row1Y + 4}" text-anchor="end" class="coef-row-label">Baseline (full sample)</text>`;
+        svg += `<line x1="${bXLower}" y1="${row1Y}" x2="${bXUpper}" y2="${row1Y}" class="coef-ci${bSig}"/>`;
+        svg += `<circle cx="${bX}" cy="${row1Y}" r="5" class="coef-point${bSig}"/>`;
+        svg += `<text x="${width - margin.right + 10}" y="${row1Y + 4}" class="coef-axis-label">${bCoef.toFixed(4)}${bStars}</text>`;
+    }
+
+    // Current specification row
+    if (current) {
+        const cCoef = current.coefficient;
+        const cLower = current.ci_lower || (cCoef - 1.96 * current.std_error);
+        const cUpper = current.ci_upper || (cCoef + 1.96 * current.std_error);
+        const cX = scale(cCoef);
+        const cXLower = scale(cLower);
+        const cXUpper = scale(cUpper);
+        const cSig = current.p_value < 0.05 ? '' : ' not-significant';
+        const cStars = getSignificanceStars(current);
+
+        const label = filterDesc || 'Current specification';
+        svg += `<text x="${margin.left - 10}" y="${row2Y + 4}" text-anchor="end" class="coef-row-label">${label}</text>`;
+        svg += `<line x1="${cXLower}" y1="${row2Y}" x2="${cXUpper}" y2="${row2Y}" class="coef-ci${cSig}"/>`;
+        svg += `<circle cx="${cX}" cy="${row2Y}" r="5" class="coef-point${cSig}"/>`;
+        svg += `<text x="${width - margin.right + 10}" y="${row2Y + 4}" class="coef-axis-label">${cCoef.toFixed(4)}${cStars}</text>`;
+    }
+
+    // X-axis
+    const axisY = margin.top + plotHeight + 15;
+    svg += `<line x1="${margin.left}" y1="${axisY - 10}" x2="${margin.left + plotWidth}" y2="${axisY - 10}" stroke="#d4d1cb" stroke-width="1"/>`;
+
+    // Tick marks and labels
+    const ticks = [minVal, 0, maxVal];
+    ticks.forEach(tick => {
+        const x = scale(tick);
+        svg += `<line x1="${x}" y1="${axisY - 15}" x2="${x}" y2="${axisY - 5}" stroke="#d4d1cb" stroke-width="1"/>`;
+        svg += `<text x="${x}" y="${axisY + 5}" text-anchor="middle" class="coef-axis-label">${tick.toFixed(3)}</text>`;
+    });
+
+    svg += '</svg>';
+
+    container.innerHTML = `
+        <div class="coef-plot">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                ${outcomeLabel}
+            </div>
+            ${svg}
+        </div>
+    `;
+}
+
+/**
+ * Update the coefficient plot when a new analysis is selected
+ */
+function updateCoefPlot(baseline, analysis, outcomeLabel) {
+    renderCoefPlot(baseline, analysis, outcomeLabel, analysis.filter_desc || 'This specification');
+}
+
+/**
+ * Initialize the coefficient plot with baseline values
+ */
+function initCoefPlot() {
+    const demBaseline = getBaseline('dem_share');
+    const turnBaseline = getBaseline('turnout');
+
+    const container = document.getElementById('coef-plot');
+    if (!container) return;
+
+    // Show initial placeholder or default baselines
+    if (demBaseline) {
+        renderCoefPlot(demBaseline, demBaseline, 'Democratic Vote Share', 'Baseline (full sample)');
+    } else {
+        container.innerHTML = `
+            <div class="coef-plot-placeholder">
+                Ask a question to see the coefficient comparison plot
+            </div>
+        `;
+    }
 }
 
 // Initialize on DOM ready
