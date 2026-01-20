@@ -482,14 +482,28 @@ async function generateResponse(query, analysis) {
 - Significance: ${getSignificanceDescription(baseline.p_value)}`;
     }
 
+    // Build specification details for the prompt
+    const timeDesc = analysis.time_window
+        ? `${analysis.time_window[0]}-${analysis.time_window[1]}`
+        : '1996-2024 (all years)';
+    const stateDesc = analysis.state_filter
+        ? (analysis.state_filter.startsWith('exclude_')
+            ? `excluding ${analysis.state_filter.replace('exclude_', '')}`
+            : `${analysis.state_filter} only`)
+        : 'all states (CA, UT, WA)';
+    const weightDesc = analysis.weighted ? ', population-weighted' : '';
+
     const systemPrompt = `You are an assistant helping users explore robustness checks for a vote-by-mail study.
 
 The user is viewing results from Thompson et al. (2020) "Universal Vote-by-Mail Has No Impact on Partisan Turnout or Vote Share".
 
-OUTCOME VARIABLE: ${outcomeLabel}
+REGRESSION SPECIFICATION:
+- Outcome: ${outcomeLabel}
+- Sample: ${stateDesc}, ${timeDesc}${weightDesc}
+- Model: ${analysis.specification_desc || analysis.specification}
+- Clustering: Standard errors clustered by ${analysis.cluster_desc || analysis.cluster}
 
-Based on their query, you found a pre-computed analysis:
-- Description: ${analysis.description}
+RESULTS:
 - Coefficient: ${analysis.coefficient?.toFixed(4)}
 - Standard Error: ${analysis.std_error?.toFixed(4)}
 - P-value: ${analysis.p_value?.toFixed(4)} (${getSignificanceDescription(analysis.p_value)})
@@ -497,13 +511,13 @@ Based on their query, you found a pre-computed analysis:
 - Clusters: ${analysis.n_clusters}
 ${baselineInfo}
 
-Provide a brief response (2-3 sentences max) that:
-1. Directly answers their question, explicitly mentioning the outcome (${outcomeLabel})
-2. States the key result with specific numbers (coefficient = X.XXX, ${getSignificanceDescription(analysis.p_value)})
-3. Compares to baseline with specific numbers (e.g., "compared to the baseline of ${baseline?.coefficient?.toFixed(4) || 'N/A'}")
-4. Is written in clear, accessible language
+Provide a response (3-4 sentences) that:
+1. States exactly what regression was run (outcome, sample, specification)
+2. Reports the coefficient and significance level with specific numbers
+3. Compares to the baseline (${baseline?.coefficient?.toFixed(4) || 'N/A'})
+4. Notes what this means substantively
 
-Keep it concise - the modified results will be displayed separately.`;
+Be precise and specific about the specification details.`;
 
     const response = await fetch('/api/chat', {
         method: 'POST',
@@ -590,11 +604,27 @@ function addMessage(container, role, text, analysis = null) {
             baselineComparison = `<br><strong>Baseline:</strong> ${baseline.coefficient?.toFixed(4)}${baselineStars} → <strong>This spec:</strong> <span class="highlight-change">${analysis.coefficient?.toFixed(4)}${stars}</span>`;
         }
 
-        // Add result preview with explicit outcome
+        // Build detailed specification string
+        const timeDesc = analysis.time_window
+            ? `${analysis.time_window[0]}-${analysis.time_window[1]}`
+            : '1996-2024 (all years)';
+        const stateDesc = analysis.state_filter
+            ? (analysis.state_filter.startsWith('exclude_')
+                ? `Excluding ${analysis.state_filter.replace('exclude_', '')}`
+                : `${analysis.state_filter} only`)
+            : 'All states (CA, UT, WA)';
+        const weightDesc = analysis.weighted ? ', population-weighted' : '';
+
+        // Add result preview with full specification details
         html += `
             <div class="result-preview">
-                <strong>Outcome: ${outcomeLabel}</strong><br>
-                ${analysis.filter_desc || 'Full sample'}${baselineComparison}<br>
+                <strong>Regression Specification:</strong><br>
+                • Outcome: ${outcomeLabel}<br>
+                • Sample: ${stateDesc}, ${timeDesc}${weightDesc}<br>
+                • Model: ${analysis.specification_desc || analysis.specification}<br>
+                • Clustering: ${analysis.cluster_desc || analysis.cluster}<br>
+                <br>
+                <strong>Results:</strong>${baselineComparison}<br>
                 Coefficient: <span class="highlight-change">${analysis.coefficient?.toFixed(4)}${stars}</span>
                 (SE: ${analysis.std_error?.toFixed(4)})<br>
                 N = ${analysis.n_obs?.toLocaleString()}, Clusters = ${analysis.n_clusters}
