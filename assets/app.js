@@ -395,7 +395,7 @@ function findBestMatchKeyword(query, section) {
     let targetTime = null;
     let targetOutcome = null;
     let targetWeighted = false;
-    let targetSpec = 'basic';
+    let targetSpec = 'quadratic';  // Default to quadratic trends (most robust specification)
 
     // First pass: check all patterns
     // Note: Don't overwrite outcome if already set (specific patterns like 'presidential'
